@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 
 const pluginName = "this-needs-a-call";
+const pluginVersion = `0.1.0+codex.${cachebuster()}`;
 const args = parseArgs(process.argv.slice(2));
 
 if (args.help || !args["app-url"]) {
@@ -23,7 +25,13 @@ const marketplaceRoot = path.resolve(
   args["marketplace-root"] ??
     path.join(os.homedir(), ".agents", "plugins"),
 );
-const pluginRoot = path.join(marketplaceRoot, "plugins", pluginName);
+const defaultMarketplaceRoot = path.join(os.homedir(), ".agents", "plugins");
+const pluginRoot = path.resolve(
+  args["plugin-root"] ??
+    (marketplaceRoot === defaultMarketplaceRoot
+      ? path.join(os.homedir(), "plugins", pluginName)
+      : path.join(marketplaceRoot, "plugins", pluginName)),
+);
 const marketplacePath = path.join(marketplaceRoot, "marketplace.json");
 
 await mkdir(path.join(pluginRoot, ".codex-plugin"), { recursive: true });
@@ -35,7 +43,7 @@ for (const skillName of ["this-needs-a-call", "this-needs-a-call-poll"]) {
 
 await writeJson(path.join(pluginRoot, ".codex-plugin", "plugin.json"), {
   name: pluginName,
-  version: "0.1.0",
+  version: pluginVersion,
   description:
     "Install This Needs A Call for Codex from a user-owned deployment.",
   author: {
@@ -86,12 +94,16 @@ await writeFile(
 );
 
 await upsertMarketplace();
+if (!args["skip-codex-install"]) {
+  await installIntoCodex();
+}
 
 console.log(`Installed ${pluginName} for ${appUrl}`);
 console.log(`Plugin: ${pluginRoot}`);
 console.log(`Marketplace: ${marketplacePath}`);
+console.log(`Version: ${pluginVersion}`);
 console.log("");
-console.log("Restart Codex or reinstall/reload plugins if the app is already open.");
+console.log("Start a new Codex thread to pick up the refreshed skills and MCP tools.");
 
 async function upsertMarketplace() {
   await mkdir(marketplaceRoot, { recursive: true });
@@ -134,6 +146,31 @@ async function upsertMarketplace() {
   }
 
   await writeJson(marketplacePath, marketplace);
+}
+
+async function installIntoCodex() {
+  const marketplaceName = await readMarketplaceName();
+  const spec = `${pluginName}@${marketplaceName}`;
+  const result = await runCommand("codex", ["plugin", "add", spec]);
+  if (result.ok) {
+    return;
+  }
+
+  console.warn("");
+  console.warn("Could not run `codex plugin add` automatically.");
+  console.warn(`Run this manually after install: codex plugin add ${spec}`);
+  if (result.error) {
+    console.warn(result.error.message);
+  }
+}
+
+async function readMarketplaceName() {
+  try {
+    const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+    return marketplace.name || "personal";
+  } catch {
+    return "personal";
+  }
 }
 
 function skillMarkdown(url, sessionCreateSecret) {
@@ -239,8 +276,8 @@ function parseArgs(values) {
       continue;
     }
     const key = value.slice(2);
-    if (key === "help") {
-      parsed.help = true;
+    if (key === "help" || key === "skip-codex-install") {
+      parsed[key] = true;
       continue;
     }
     parsed[key] = values[index + 1];
@@ -268,6 +305,24 @@ async function writeJson(file, value) {
   await writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function cachebuster() {
+  return new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      stdio: "inherit",
+    });
+    child.on("error", (error) => {
+      resolve({ ok: false, error });
+    });
+    child.on("exit", (code) => {
+      resolve({ ok: code === 0 });
+    });
+  });
+}
+
 function printHelp(code) {
   const home = path.join("~", ".agents", "plugins");
   console.log(`Usage:
@@ -277,6 +332,8 @@ function printHelp(code) {
 
 Options:
   --marketplace-root <path>  Default: ${home}
+  --plugin-root <path>       Default: ~/plugins/this-needs-a-call
+  --skip-codex-install       Only write the marketplace plugin files
   --help
 
 If --mcp-secret is omitted, the installer reads MCP_SHARED_SECRET from the

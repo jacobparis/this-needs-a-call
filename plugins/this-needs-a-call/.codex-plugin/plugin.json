@@ -1,13 +1,13 @@
 {
   "name": "this-needs-a-call",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.template",
   "description": "Start and monitor self-hosted voice-call sessions from Codex.",
   "author": {
     "name": "This Needs A Call",
-    "url": "https://github.com/your-org/this-needs-a-call"
+    "url": "https://github.com/jacobparis/this-needs-a-call"
   },
-  "homepage": "https://github.com/your-org/this-needs-a-call",
-  "repository": "https://github.com/your-org/this-needs-a-call",
+  "homepage": "https://github.com/jacobparis/this-needs-a-call",
+  "repository": "https://github.com/jacobparis/this-needs-a-call",
   "license": "MIT",
   "keywords": ["codex", "voice", "mcp", "calls"],
   "skills": "./skills/",
@@ -19,7 +19,7 @@
     "developerName": "This Needs A Call",
     "category": "Productivity",
     "capabilities": ["Interactive", "Read", "Write"],
-    "websiteURL": "https://github.com/your-org/this-needs-a-call",
+    "websiteURL": "https://github.com/jacobparis/this-needs-a-call",
     "defaultPrompt": [
       "Start a voice call for this thread",
       "Monitor spoken call updates and act on them"

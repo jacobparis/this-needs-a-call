@@ -157,7 +157,7 @@ function LandingPage() {
     {
       label: "Install the Plugin",
       detail:
-        "Pull the Vercel dev environment and install the Codex plugin before starting the app. The MCP server points at the stable Portless URL.",
+        "Pull the Vercel dev environment and install or refresh the Codex plugin before starting the app. The bundled MCP server points at the stable Portless URL.",
       action: (
         <div className="grid w-full max-w-[760px] gap-3">
           <CopyableCommand command={localCodexInstallCommand} />

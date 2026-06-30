@@ -1,7 +1,7 @@
 # Codex Integration
 
-The installer writes a local Codex plugin configured for one app URL and one
-`MCP_SHARED_SECRET`.
+The installer writes and installs a local Codex plugin configured for one app
+URL and one `MCP_SHARED_SECRET`.
 
 Local development:
 
@@ -19,3 +19,5 @@ vercel env run -e production -- npm run install:codex-plugin -- \
 ```
 
 The generated plugin contains bearer credentials. Keep it local and private.
+Start a new Codex thread after reinstalling so the refreshed MCP server is
+available.
