@@ -217,11 +217,9 @@ Use the MCP server named \`call\` as an alternate input stream for this Codex th
 
 When the ready batch contains or may contain a user request, call \`get_full_transcript\` for context. Decide whether the user is asking Codex to do work. If so, use Codex's normal available tools in this thread to handle that work end to end.
 
-If a ready event has type \`grill\`, parse its JSON detail and act as Codex: inspect relevant code context if needed, then post exactly one pointed grilling question using the event scope, prompt, severity, and expectedSignal. Do not execute project changes for a grill event unless the transcript also contains an explicit implementation request.
-
 If you notify the Codex thread, write from the user's point of view: say what changed or what you did, but do not describe internal mechanics such as queues, batches, polling, MCP delivery, event IDs, or implementation details unless the user explicitly asks for them.
 
-If the completion/update should also be heard inside the active voice call, call \`say_text\` with the appropriate \`channelId\` and a concise completion update before wrapping up.
+If the completion/update should also be heard inside the active voice call, call \`say_text\` with a concise completion update before wrapping up.
 
 If there is no new useful user-facing information, do not post a message and do not call \`say_text\`.
 

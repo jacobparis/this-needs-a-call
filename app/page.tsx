@@ -70,7 +70,7 @@ function LandingPage() {
               scheduled
             </span>
             Second takeaway: route completion updates back into the active voice
-            channel so phone sessions hear when Codex finishes work.
+            call so phone sessions hear when Codex finishes work.
           </div>
           <div className="max-w-[82%] justify-self-start rounded-lg border border-[var(--line)] bg-[var(--panel-soft)] px-2.5 py-2.5 text-[13px] leading-[1.35] text-[var(--ink)]">
             I’m implementing the share flow first: signed link, QR handoff,
@@ -133,7 +133,7 @@ function LandingPage() {
               voice
             </span>
             So the feature is two-way: transcript to Codex, and concise status
-            from Codex back into the active voice channel.
+            from Codex back into the active voice call.
           </p>
         </div>
       </div>

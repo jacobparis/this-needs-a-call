@@ -17,7 +17,6 @@ import { authorizeBearerSecret } from "@/app/lib/server-auth";
 type StartSessionBody = {
   reset?: boolean;
   contact?: string;
-  scenario?: string;
   openingLine?: string;
   agent?: string;
 };
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
       const body = (await request.json().catch(() => ({}))) as StartSessionBody;
       const { access, call } = createCallSessionAccess({
         contact: body.contact ?? "This Needs A Call",
-        scenario: body.scenario ?? "realtime:core",
         openingLine:
           body.openingLine ??
           "Call session created by Codex. The page should connect the realtime voice agent automatically.",

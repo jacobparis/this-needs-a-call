@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CallSessionSummary,
-  ChannelMessage,
   TranscriptEntry,
+  VoiceMessage,
 } from "@/app/lib/calls";
 
 declare global {
@@ -20,56 +20,15 @@ type RealtimeEvent = {
   detail: string;
   at: string;
 };
-type ChannelId = "core" | "review" | "ops";
-type ChannelState = {
-  transcript: TranscriptEntry[];
-  events: RealtimeEvent[];
-  grillMode: boolean;
-};
-
-const channels: Array<{
-  id: ChannelId;
-  name: string;
-  voice: "alloy" | "ash" | "ballad";
-  tone: string;
-}> = [
-  {
-    id: "core",
-    name: "Core Build",
-    voice: "alloy",
-    tone: "concise software engineering call partner",
-  },
-  {
-    id: "review",
-    name: "Code Review",
-    voice: "ash",
-    tone: "direct code-review partner",
-  },
-  {
-    id: "ops",
-    name: "Ops Follow-up",
-    voice: "ballad",
-    tone: "calm operations coordinator",
-  },
-];
-
 const inputSampleRate = 24000;
 const defaultCodingAgentName = "Codex";
+const voiceName = "alloy";
 
 type VoiceSessionProps = {
   initialSessionId: string;
 };
 
 export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
-  const [activeChannelId, setActiveChannelId] = useState<ChannelId>("core");
-  const [liveChannelId, setLiveChannelId] = useState<ChannelId>("core");
-  const [channelStates, setChannelStates] = useState<
-    Record<ChannelId, ChannelState>
-  >({
-    core: { transcript: [], events: [], grillMode: false },
-    review: { transcript: [], events: [], grillMode: false },
-    ops: { transcript: [], events: [], grillMode: false },
-  });
   const [connection, setConnection] = useState<ConnectionState>("disconnected");
   const [, setMicPermission] = useState<MicPermissionState>("unknown");
   const [isCapturing, setIsCapturing] = useState(false);
@@ -78,7 +37,6 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<RealtimeEvent[]>([]);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [, setGrillMode] = useState(false);
   const [elapsed, setElapsed] = useState("00:00");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -93,13 +51,10 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
   const playbackTimeRef = useRef(0);
   const lastBargeInAtRef = useRef(-Infinity);
   const activeResponseRef = useRef(false);
-  const pendingChannelMessagesRef = useRef<ChannelMessage[]>([]);
-  const channelMessageDrainTimerRef = useRef<number | null>(null);
-  const drainChannelMessageQueueRef = useRef<() => void>(() => {});
+  const pendingVoiceMessagesRef = useRef<VoiceMessage[]>([]);
+  const voiceMessageDrainTimerRef = useRef<number | null>(null);
+  const drainVoiceMessageQueueRef = useRef<() => void>(() => {});
   const autostartedRef = useRef(false);
-  const activeChannelIdRef = useRef<ChannelId>("core");
-  const liveChannelIdRef = useRef<ChannelId>("core");
-  const grillModeRef = useRef(false);
   const assistantDraftRef = useRef("");
   const assistantDraftIdRef = useRef<string | null>(null);
   const userDraftRef = useRef("");
@@ -108,13 +63,6 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
-  useEffect(() => {
-    activeChannelIdRef.current = activeChannelId;
-  }, [activeChannelId]);
-
-  useEffect(() => {
-    liveChannelIdRef.current = liveChannelId;
-  }, [liveChannelId]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -137,8 +85,8 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
 
   useEffect(() => {
     return () => {
-      if (channelMessageDrainTimerRef.current !== null) {
-        window.clearTimeout(channelMessageDrainTimerRef.current);
+      if (voiceMessageDrainTimerRef.current !== null) {
+        window.clearTimeout(voiceMessageDrainTimerRef.current);
       }
     };
   }, []);
@@ -252,19 +200,7 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
       detail,
       at: new Date().toLocaleTimeString(),
     };
-    const targetChannelId = liveChannelIdRef.current;
-    if (activeChannelIdRef.current === targetChannelId) {
-      setEvents((current) => [event, ...current].slice(0, 18));
-      return;
-    }
-
-    setChannelStates((current) => ({
-      ...current,
-      [targetChannelId]: {
-        ...current[targetChannelId],
-        events: [event, ...current[targetChannelId].events].slice(0, 18),
-      },
-    }));
+    setEvents((current) => [event, ...current].slice(0, 18));
   }, []);
 
   const syncState = useCallback(
@@ -286,15 +222,14 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
 
   const pushCallEvent = useCallback(
     async (eventType: string, detail: string, payload?: unknown) => {
-      const channelId = liveChannelIdRef.current;
       await syncState({
         action: "event",
         eventType,
         detail,
         payload:
           payload && typeof payload === "object"
-            ? { ...(payload as Record<string, unknown>), channelId }
-            : { channelId },
+            ? { ...(payload as Record<string, unknown>) }
+            : undefined,
       });
     },
     [syncState],
@@ -345,9 +280,6 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
 
     return new Promise((resolve) => {
       ws.onopen = () => {
-      const channel =
-        channels.find((entry) => entry.id === liveChannelIdRef.current) ??
-        channels[0];
       const agentName = readCodingAgentName();
       setConnection("connected");
       const now = Date.now();
@@ -358,21 +290,20 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
         JSON.stringify({
           type: "session-update",
           config: {
-            voice: channel.voice,
+            voice: voiceName,
             inputAudioTranscription: {
               model: "gpt-4o-mini-transcribe",
             },
             outputAudioTranscription: {},
             turnDetection: { type: "server-vad" },
             instructions:
-              `You are This Needs A Call for the ${channel.name} channel, a ${channel.tone}. There are three parties in this conversation: (1) the user, a developer who is speaking, planning features, and giving feedback; (2) you, the voice agent, who is only a conversational partner; and (3) ${agentName}, the coding agent that monitors this transcript and performs project work. You can reason conversationally, ask clarifying questions, describe workflow possibilities, and explain what ${agentName} should pick up. You do not have tools or workflows yourself, and you must not claim to execute code, inspect files, call MCP tools, deploy, or change the project. When the user asks for implementation, inspection, deployment, usage checks, workflow execution, or tool use, acknowledge briefly that ${agentName} should pick it up from the transcript and name the requested workflow in plain language. Do not say you lack access, do not ask the user to paste a separate prompt, and do not pretend to be ${agentName}. Speak naturally and keep responses short. Keep this channel's conversation separate from other channels. If the user asks to grill them or grill the code, acknowledge that grill mode is starting. If they ask to stop grilling, acknowledge that grill mode is ending.`,
+              `You are This Needs A Call, a concise voice conversation partner for coding work. There are three parties in this conversation: (1) the user, a developer who is speaking, planning features, and giving feedback; (2) you, the voice agent, who is only a conversational partner; and (3) ${agentName}, the coding agent that monitors this transcript and performs project work. You can reason conversationally, ask clarifying questions, describe workflow possibilities, and explain what ${agentName} should pick up. You do not have tools or workflows yourself, and you must not claim to execute code, inspect files, call MCP tools, deploy, or change the project. When the user asks for implementation, inspection, deployment, usage checks, workflow execution, or tool use, acknowledge briefly that ${agentName} should pick it up from the transcript and name the requested workflow in plain language. Do not say you lack access, do not ask the user to paste a separate prompt, and do not pretend to be ${agentName}. Speak naturally and keep responses short.`,
           },
         }),
       );
       void syncState({
         action: "start",
-        contact: channel.name,
-        scenario: `realtime:${channel.id}`,
+        contact: "This Needs A Call",
       });
       resolve(ws);
     };
@@ -426,48 +357,6 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
     setStartedAt(null);
   }
 
-  function switchChannel(nextChannelId: ChannelId) {
-    if (nextChannelId === activeChannelId) {
-      return;
-    }
-
-    setChannelStates((current) => ({
-      ...current,
-      [activeChannelId]: {
-        transcript,
-        events,
-        grillMode: grillModeRef.current,
-      },
-    }));
-    const nextState = channelStates[nextChannelId];
-    activeChannelIdRef.current = nextChannelId;
-    setActiveChannelId(nextChannelId);
-    setTranscript(nextState.transcript);
-    setEvents(nextState.events);
-    setGrillMode(nextState.grillMode);
-    grillModeRef.current = nextState.grillMode;
-    assistantDraftRef.current = "";
-    userDraftRef.current = "";
-  }
-
-  function activateChannel(nextChannelId: ChannelId) {
-    if (nextChannelId === liveChannelId) {
-      return;
-    }
-
-    stopMic();
-    stopAssistantPlayback();
-    wsRef.current?.close();
-    wsRef.current = null;
-    liveChannelIdRef.current = nextChannelId;
-    setLiveChannelId(nextChannelId);
-    setConnection("disconnected");
-    setStartedAt(null);
-    setMicLevel(0);
-    setIsCapturing(false);
-    setIsPlaying(false);
-  }
-
   async function selectCallSession(nextSessionId: string) {
     if (nextSessionId === sessionIdRef.current) {
       return;
@@ -495,11 +384,11 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
     }
     const payload = (await response.json().catch(() => null)) as {
       fullTranscript?: { transcript?: TranscriptEntry[] };
-      channelMessages?: ChannelMessage[];
+      voiceMessages?: VoiceMessage[];
     } | null;
     setTranscript(payload?.fullTranscript?.transcript ?? []);
-    if (payload?.channelMessages) {
-      handleIncomingChannelMessages(payload.channelMessages);
+    if (payload?.voiceMessages) {
+      handleIncomingVoiceMessages(payload.voiceMessages);
     }
   }
 
@@ -508,13 +397,13 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
     [],
   );
 
-  const injectChannelMessage = useCallback(
-    (message: ChannelMessage) => {
+  const injectVoiceMessage = useCallback(
+    (message: VoiceMessage) => {
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN || isVoiceBusy()) {
         return false;
       }
-      if (!acquireChannelMessageLock(message.id)) {
+      if (!acquireVoiceMessageLock(message.id)) {
         return true;
       }
 
@@ -534,7 +423,7 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
       activeResponseRef.current = true;
       addEvent("agent-message", message.text.slice(0, 140));
       void syncState({
-        action: "mark_channel_messages",
+        action: "mark_voice_messages",
         messageIds: [message.id],
       });
       return true;
@@ -542,74 +431,71 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
     [addEvent, isVoiceBusy, syncState],
   );
 
-  const scheduleChannelMessageDrain = useCallback((delayMs = 300) => {
-    if (channelMessageDrainTimerRef.current !== null) {
+  const scheduleVoiceMessageDrain = useCallback((delayMs = 300) => {
+    if (voiceMessageDrainTimerRef.current !== null) {
       return;
     }
-    channelMessageDrainTimerRef.current = window.setTimeout(() => {
-      channelMessageDrainTimerRef.current = null;
-      drainChannelMessageQueueRef.current();
+    voiceMessageDrainTimerRef.current = window.setTimeout(() => {
+      voiceMessageDrainTimerRef.current = null;
+      drainVoiceMessageQueueRef.current();
     }, delayMs);
   }, []);
 
-  const drainChannelMessageQueue = useCallback(() => {
-    if (pendingChannelMessagesRef.current.length === 0) {
+  const drainVoiceMessageQueue = useCallback(() => {
+    if (pendingVoiceMessagesRef.current.length === 0) {
       return;
     }
 
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN || isVoiceBusy()) {
-      scheduleChannelMessageDrain(500);
+      scheduleVoiceMessageDrain(500);
       return;
     }
 
-    const [message, ...remaining] = pendingChannelMessagesRef.current;
-    pendingChannelMessagesRef.current = remaining;
-    const injected = injectChannelMessage(message);
+    const [message, ...remaining] = pendingVoiceMessagesRef.current;
+    pendingVoiceMessagesRef.current = remaining;
+    const injected = injectVoiceMessage(message);
     if (!injected) {
-      pendingChannelMessagesRef.current = [
+      pendingVoiceMessagesRef.current = [
         message,
-        ...pendingChannelMessagesRef.current,
+        ...pendingVoiceMessagesRef.current,
       ];
     }
-    if (pendingChannelMessagesRef.current.length > 0) {
-      scheduleChannelMessageDrain(injected ? 500 : 750);
+    if (pendingVoiceMessagesRef.current.length > 0) {
+      scheduleVoiceMessageDrain(injected ? 500 : 750);
     }
-  }, [injectChannelMessage, isVoiceBusy, scheduleChannelMessageDrain]);
+  }, [injectVoiceMessage, isVoiceBusy, scheduleVoiceMessageDrain]);
 
   useEffect(() => {
-    drainChannelMessageQueueRef.current = drainChannelMessageQueue;
-  }, [drainChannelMessageQueue]);
+    drainVoiceMessageQueueRef.current = drainVoiceMessageQueue;
+  }, [drainVoiceMessageQueue]);
 
-  const handleIncomingChannelMessages = useCallback(
-    (messages: ChannelMessage[]) => {
-      const actionable = messages.filter(
-        (message) =>
-          !message.read && message.channelId === liveChannelIdRef.current,
-      );
+  const handleIncomingVoiceMessages = useCallback(
+    (messages: VoiceMessage[]) => {
+      const actionable = messages.filter((message) => !message.read);
 
       if (actionable.length === 0) {
         return;
       }
 
       const queuedIds = new Set(
-        pendingChannelMessagesRef.current.map((message) => message.id),
+        pendingVoiceMessagesRef.current.map((message) => message.id),
       );
       for (const message of actionable) {
         if (!queuedIds.has(message.id)) {
-          pendingChannelMessagesRef.current.push(message);
+          pendingVoiceMessagesRef.current.push(message);
           queuedIds.add(message.id);
         }
       }
-      scheduleChannelMessageDrain();
+      scheduleVoiceMessageDrain();
     },
-    [scheduleChannelMessageDrain],
+    [scheduleVoiceMessageDrain],
   );
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadChannelMessages() {
+    async function loadVoiceMessages() {
       const activeSessionId = sessionIdRef.current;
       if (!activeSessionId) {
         return;
@@ -621,24 +507,24 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
         return;
       }
       const payload = (await response.json().catch(() => null)) as {
-        channelMessages?: ChannelMessage[];
+        voiceMessages?: VoiceMessage[];
       } | null;
-      if (!payload?.channelMessages || cancelled) {
+      if (!payload?.voiceMessages || cancelled) {
         return;
       }
-      handleIncomingChannelMessages(payload.channelMessages);
+      handleIncomingVoiceMessages(payload.voiceMessages);
     }
 
-    void loadChannelMessages();
+    void loadVoiceMessages();
     const interval = window.setInterval(() => {
-      void loadChannelMessages();
+      void loadVoiceMessages();
     }, 2000);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [handleIncomingChannelMessages]);
+  }, [handleIncomingVoiceMessages]);
 
   async function toggleMic() {
     if (isCapturing) {
@@ -857,13 +743,12 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
         role: "user",
         text: userDraftRef.current.trim(),
       });
-      void handleGrillModeTurn(userDraftRef.current.trim());
       userDraftRef.current = "";
     }
 
     if (type === "response-done") {
       activeResponseRef.current = false;
-      scheduleChannelMessageDrain();
+      scheduleVoiceMessageDrain();
       if (assistantDraftRef.current.trim()) {
         const entry = createTranscriptEntry(
           assistantDraftIdRef.current ?? assistantDraftId(event),
@@ -901,27 +786,10 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
   }
 
   function upsertTranscriptEntry(entry: TranscriptEntry) {
-    const targetChannelId = liveChannelIdRef.current;
-    if (activeChannelIdRef.current === targetChannelId) {
-      setTranscript((entries) => {
-        const next = entries.filter((current) => current.id !== entry.id);
-        return [...next, entry];
-      });
-      return;
-    }
-
-    setChannelStates((current) => ({
-      ...current,
-      [targetChannelId]: {
-        ...current[targetChannelId],
-        transcript: [
-          ...current[targetChannelId].transcript.filter(
-            (currentEntry) => currentEntry.id !== entry.id,
-          ),
-          entry,
-        ],
-      },
-    }));
+    setTranscript((entries) => {
+      const next = entries.filter((current) => current.id !== entry.id);
+      return [...next, entry];
+    });
   }
 
   function playPcm16(base64Audio: string) {
@@ -952,7 +820,7 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
       playbackSourcesRef.current.delete(source);
       if (context.currentTime >= playbackTimeRef.current - 0.05) {
         setIsPlaying(false);
-        scheduleChannelMessageDrain();
+        scheduleVoiceMessageDrain();
       }
     };
   }
@@ -995,41 +863,6 @@ export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
     playbackSourcesRef.current.clear();
     playbackTimeRef.current = playbackContextRef.current?.currentTime ?? 0;
     setIsPlaying(false);
-  }
-
-  async function handleGrillModeTurn(text: string) {
-    const command = grillCommand(text);
-
-    if (command === "start") {
-      grillModeRef.current = true;
-      setGrillMode(true);
-      addEvent("grill-mode", "Started grill mode.");
-      await syncState({
-        action: "grill_mode",
-        active: true,
-        scope: inferGrillScope(text),
-        mode: inferGrillMode(text),
-      });
-      return;
-    }
-
-    if (command === "stop") {
-      grillModeRef.current = false;
-      setGrillMode(false);
-      addEvent("grill-mode", "Stopped grill mode.");
-      await syncState({
-        action: "grill_mode",
-        active: false,
-      });
-      return;
-    }
-
-    if (grillModeRef.current) {
-      await syncState({
-        action: "grill_turn",
-        userTurn: text,
-      });
-    }
   }
 
   useEffect(() => {
@@ -1201,7 +1034,7 @@ function readCodingAgentName(): string {
   return agentName;
 }
 
-function acquireChannelMessageLock(messageId: string): boolean {
+function acquireVoiceMessageLock(messageId: string): boolean {
   if (typeof window === "undefined") {
     return true;
   }
@@ -1215,61 +1048,6 @@ function acquireChannelMessageLock(messageId: string): boolean {
 
   window.localStorage.setItem(key, String(now));
   return true;
-}
-
-function grillCommand(text: string): "start" | "stop" | null {
-  const normalized = text.toLowerCase();
-
-  if (
-    normalized.includes("stop grilling") ||
-    normalized.includes("turn off grill") ||
-    normalized.includes("exit grill")
-  ) {
-    return "stop";
-  }
-
-  if (
-    normalized.includes("grill me") ||
-    normalized.includes("grill mode") ||
-    normalized.includes("grill this") ||
-    normalized.includes("grill the code")
-  ) {
-    return "start";
-  }
-
-  return null;
-}
-
-function inferGrillMode(text: string): "quick" | "deep" | "focused" {
-  const normalized = text.toLowerCase();
-
-  if (normalized.includes("quick")) {
-    return "quick";
-  }
-
-  if (normalized.includes("deep")) {
-    return "deep";
-  }
-
-  return "focused";
-}
-
-function inferGrillScope(text: string): string {
-  const normalized = text.toLowerCase();
-
-  if (normalized.includes("this file")) {
-    return "current file";
-  }
-
-  if (normalized.includes("this repo") || normalized.includes("codebase")) {
-    return "current codebase";
-  }
-
-  if (normalized.includes("mcp")) {
-    return "MCP integration";
-  }
-
-  return "current codebase";
 }
 
 function summarizeEvent(event: Record<string, unknown>): string {

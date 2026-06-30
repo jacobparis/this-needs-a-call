@@ -10,28 +10,13 @@ export type TranscriptEntry = {
   createdAt: string;
 };
 
-export type GrillMode = "quick" | "deep" | "focused";
-
-export type GrillSession = {
-  id: string;
-  active: boolean;
-  scope: string;
-  mode: GrillMode;
-  backlog: string[];
-  lastFinding: string | null;
-  startedAt: string | null;
-  updatedAt: string | null;
-};
-
 export type CallState = {
   id: string;
   contact: string;
-  scenario: string;
   status: CallStatus;
   startedAt: string | null;
   endedAt: string | null;
   muted: boolean;
-  grillSession: GrillSession;
   transcript: TranscriptEntry[];
 };
 
@@ -50,11 +35,9 @@ export type CallEvent = {
 export type CallSummary = {
   status: CallStatus;
   contact: string;
-  scenario: string;
   startedAt: string | null;
   endedAt: string | null;
   messageCount: number;
-  grillSession: GrillSession;
   latestMessages: TranscriptEntry[];
   summary: string;
 };
@@ -77,13 +60,12 @@ export type CallEventBatch = {
   guidance: string;
 };
 
-export type ChannelMessagePriority = "low" | "normal" | "high";
+export type VoiceMessagePriority = "low" | "normal" | "high";
 
-export type ChannelMessage = {
+export type VoiceMessage = {
   id: string;
-  channelId: string;
   text: string;
-  priority: ChannelMessagePriority;
+  priority: VoiceMessagePriority;
   createdAt: string;
   read: boolean;
   spoken: boolean;
@@ -102,7 +84,6 @@ export type CallSessionAccess = {
 export type CallSessionSummary = {
   id: string;
   contact: string;
-  scenario: string;
   status: CallStatus;
   startedAt: string | null;
   endedAt: string | null;
@@ -113,7 +94,7 @@ export type CallSessionSummary = {
 export type ThisNeedsACallSessionStore = {
   current: CallState;
   events: CallEvent[];
-  channelMessages: ChannelMessage[];
+  voiceMessages: VoiceMessage[];
   nextSequence: number;
   secretHash: string;
   createdAt: string;
@@ -122,24 +103,13 @@ export type ThisNeedsACallSessionStore = {
 
 type SessionStore = ThisNeedsACallSessionStore;
 
-const scenarios = {
-  intake:
-    "You are a calm engineering intake assistant. Ask what changed, what the user expected, and what evidence exists.",
-  incident:
-    "You are an incident commander. Gather impact, timeline, mitigations, and next decisions.",
-  review:
-    "You are a code-review operator. Ask for the diff, test signal, risk area, and rollout plan.",
-};
-
 const defaultCall: CallState = {
   id: "call_demo",
   contact: "This Needs A Call",
-  scenario: "intake",
   status: "idle",
   startedAt: null,
   endedAt: null,
   muted: false,
-  grillSession: defaultGrillSession(),
   transcript: [],
 };
 
@@ -162,7 +132,7 @@ export function getStore(): ThisNeedsACallStore {
     const legacy = globalStore.__thisNeedsACall as unknown as {
       current?: CallState;
       events?: CallEvent[];
-      channelMessages?: ChannelMessage[];
+      voiceMessages?: VoiceMessage[];
       nextSequence?: number;
     };
     const now = new Date().toISOString();
@@ -172,7 +142,7 @@ export function getStore(): ThisNeedsACallStore {
         [current.id]: {
           current,
           events: legacy.events ?? [],
-          channelMessages: legacy.channelMessages ?? [],
+          voiceMessages: legacy.voiceMessages ?? [],
           nextSequence: legacy.nextSequence ?? 1,
           secretHash: hashSecret(randomSecret()),
           createdAt: current.startedAt ?? now,
@@ -212,24 +182,21 @@ function normalizeStore(store: ThisNeedsACallStore): ThisNeedsACallStore {
   const sessions = Object.fromEntries(
     Object.entries(store.sessions ?? {})
       .filter(([, session]) => session?.current?.id)
-      .map(([id, session]) => [
-        id,
-        {
+      .map(([id, session]) => {
+        return [
+          id,
+          {
           current: {
             ...structuredClone(defaultCall),
             ...session.current,
             id: session.current.id,
-            grillSession: {
-              ...defaultGrillSession(),
-              ...session.current.grillSession,
-            },
             transcript: Array.isArray(session.current.transcript)
               ? session.current.transcript
               : [],
           },
           events: Array.isArray(session.events) ? session.events.slice(-200) : [],
-          channelMessages: Array.isArray(session.channelMessages)
-            ? session.channelMessages.slice(-100)
+          voiceMessages: Array.isArray(session.voiceMessages)
+            ? session.voiceMessages.slice(-100)
             : [],
           nextSequence:
             typeof session.nextSequence === "number" && Number.isFinite(session.nextSequence)
@@ -244,7 +211,8 @@ function normalizeStore(store: ThisNeedsACallStore): ThisNeedsACallStore {
           updatedAt:
             typeof session.updatedAt === "string" ? session.updatedAt : now,
         },
-      ]),
+        ];
+      }),
   );
 
   if (Object.keys(sessions).length === 0) {
@@ -279,7 +247,6 @@ export function setActiveCallSession(sessionId: string): boolean {
 
 export function createCallSessionAccess(input?: {
   contact?: string;
-  scenario?: keyof typeof scenarios | string;
   openingLine?: string;
   agent?: string;
 }): { access: CallSessionAccess; call: CallState } {
@@ -293,7 +260,6 @@ export function createCallSessionAccess(input?: {
   const call = startCall({
     id: access.id,
     contact: input?.contact,
-    scenario: input?.scenario,
     openingLine: input?.openingLine,
   });
   return { access, call };
@@ -306,7 +272,6 @@ export function listCallSessions(sessionIds: string[]): CallSessionSummary[] {
     .map((session) => ({
       id: session.current.id,
       contact: session.current.contact,
-      scenario: session.current.scenario,
       status: session.current.status,
       startedAt: session.current.startedAt,
       endedAt: session.current.endedAt,
@@ -338,11 +303,10 @@ export function resetCall(): CallState {
   session.current = {
     ...structuredClone(defaultCall),
     id: session.current.id,
-    grillSession: defaultGrillSession(),
     transcript: [],
   };
   session.events = [];
-  session.channelMessages = [];
+  session.voiceMessages = [];
   session.nextSequence = 1;
   session.updatedAt = new Date().toISOString();
   return session.current;
@@ -351,7 +315,6 @@ export function resetCall(): CallState {
 export function startCall(input?: {
   id?: string;
   contact?: string;
-  scenario?: keyof typeof scenarios | string;
   openingLine?: string;
 }): CallState {
   const store = getStore();
@@ -370,32 +333,17 @@ export function startCall(input?: {
   }
 
   const now = new Date().toISOString();
-  const scenario = input?.scenario ?? "intake";
   const contact = input?.contact?.trim() || "This Needs A Call";
   const openingLine = input?.openingLine?.trim();
-  const systemPrompt =
-    scenario in scenarios ? scenarios[scenario as keyof typeof scenarios] : null;
 
   session.current = {
     id: input?.id?.trim() || session.current.id || makeId("call"),
     contact,
-    scenario: String(scenario),
     status: "active",
     startedAt: now,
     endedAt: null,
     muted: false,
-    grillSession: defaultGrillSession(),
     transcript: [
-      ...(systemPrompt
-        ? [
-            {
-              id: makeId("system"),
-              role: "system" as const,
-              text: systemPrompt,
-              createdAt: now,
-            },
-          ]
-        : []),
       ...(openingLine
         ? [
             {
@@ -410,7 +358,7 @@ export function startCall(input?: {
   };
   addCallEvent({
     type: "call_started",
-    detail: `${contact} started a ${String(scenario)} call.`,
+    detail: `${contact} started a call.`,
   });
 
   session.updatedAt = now;
@@ -492,122 +440,6 @@ export function setMute(muted: boolean): CallState {
     muted,
   };
   return store.current;
-}
-
-export function setGrillMode(input: {
-  active: boolean;
-  scope?: string;
-  mode?: GrillMode | string;
-}): CallState {
-  const store = getActiveSessionStore();
-  const now = new Date().toISOString();
-  const existing = store.current.grillSession;
-  const active = input.active;
-  const scope = input.scope?.trim() || existing.scope || "current codebase";
-  const mode = grillModeArg(input.mode) ?? existing.mode;
-
-  store.current = {
-    ...store.current,
-    grillSession: {
-      ...existing,
-      id: active && !existing.active ? makeId("grill") : existing.id,
-      active,
-      scope,
-      mode,
-      backlog: active ? existing.backlog : [],
-      lastFinding: active ? existing.lastFinding : null,
-      startedAt: active ? existing.startedAt ?? now : existing.startedAt,
-      updatedAt: now,
-    },
-  };
-  addCallEvent({
-    type: "grill_mode",
-    detail: JSON.stringify({
-      type: "grill_mode",
-      active,
-      sessionId: store.current.grillSession.id,
-      scope,
-      mode,
-    }),
-  });
-  if (active) {
-    const prompt = selectGrillPrompt(
-      `Start grilling ${scope}. Walk the design tree.`,
-      store.current.grillSession,
-    );
-    store.current = {
-      ...store.current,
-      grillSession: {
-        ...store.current.grillSession,
-        backlog: [...store.current.grillSession.backlog, prompt].slice(-12),
-        lastFinding: prompt,
-      },
-    };
-    addGrillEvent({
-      session: store.current.grillSession,
-      prompt,
-      userTurn: "grill mode started",
-    });
-  }
-
-  return store.current;
-}
-
-export function recordGrillTurn(input: { userTurn: string }): CallEvent | null {
-  const store = getActiveSessionStore();
-  const userTurn = input.userTurn.trim();
-  const session = store.current.grillSession;
-
-  if (!session.active || !userTurn) {
-    return null;
-  }
-
-  const prompt = selectGrillPrompt(userTurn, session);
-  const now = new Date().toISOString();
-
-  store.current = {
-    ...store.current,
-    grillSession: {
-      ...session,
-      backlog: [...session.backlog, prompt].slice(-12),
-      lastFinding: prompt,
-      updatedAt: now,
-    },
-  };
-
-  return addGrillEvent({
-    session: store.current.grillSession,
-    prompt,
-    userTurn,
-  });
-}
-
-function addGrillEvent(input: {
-  session: GrillSession;
-  prompt: string;
-  userTurn: string;
-}): CallEvent {
-  return addCallEvent({
-    type: "grill",
-    detail: JSON.stringify({
-      type: "grill",
-      sessionId: input.session.id,
-      scope: input.session.scope,
-      mode: input.session.mode,
-      severity: input.session.mode === "quick" ? "medium" : "high",
-      prompt: input.prompt,
-      userTurn: input.userTurn,
-      rules: [
-        "Interview relentlessly until the plan is explicit and internally consistent.",
-        "Walk the decision tree one branch at a time; resolve dependencies before moving on.",
-        "Ask exactly one question now.",
-        "Include your recommended answer with the question.",
-        "If code context can answer part of the question, inspect the code instead of asking the user for that fact.",
-      ],
-      expectedSignal:
-        "The coding agent should inspect relevant code context when useful, ask exactly one pointed Grill Me question, include a recommended answer, then wait for the user's answer before continuing.",
-    }),
-  });
 }
 
 export function addCallEvent(input: {
@@ -761,19 +593,17 @@ export function markEventsDelivered(ids?: string[]): CallEvent[] {
   return store.events;
 }
 
-export function addChannelMessage(input: {
-  channelId?: string;
+export function addVoiceMessage(input: {
   text?: string;
   priority?: string;
-}): ChannelMessage | null {
+}): VoiceMessage | null {
   const text = input.text?.trim();
   if (!text) {
     return null;
   }
 
-  const message: ChannelMessage = {
-    id: makeId("channel_message"),
-    channelId: input.channelId?.trim() || "core",
+  const message: VoiceMessage = {
+    id: makeId("voice_message"),
     text,
     priority: priorityArg(input.priority),
     createdAt: new Date().toISOString(),
@@ -781,27 +611,23 @@ export function addChannelMessage(input: {
     spoken: false,
   };
   const store = getActiveSessionStore();
-  store.channelMessages = [...store.channelMessages, message].slice(-100);
+  store.voiceMessages = [...store.voiceMessages, message].slice(-100);
   addCallEvent({
-    type: "channel_message",
-    detail: `${message.channelId}: ${message.text}`,
-    payload: { kind: "channel_message", message },
+    type: "voice_message",
+    detail: message.text,
+    payload: { kind: "voice_message", message },
   });
   return message;
 }
 
-export function getChannelMessages(input?: {
+export function getVoiceMessages(input?: {
   includeRead?: boolean;
-  channelId?: string;
   limit?: number;
-}): ChannelMessage[] {
+}): VoiceMessage[] {
   const store = getActiveSessionStore();
   const limit = Math.max(1, Math.min(input?.limit ?? 50, 100));
-  const messages = store.channelMessages.filter((message) => {
+  const messages = store.voiceMessages.filter((message) => {
     if (!input?.includeRead && message.read) {
-      return false;
-    }
-    if (input?.channelId && message.channelId !== input.channelId) {
       return false;
     }
     return true;
@@ -809,26 +635,26 @@ export function getChannelMessages(input?: {
   return messages.slice(-limit);
 }
 
-export function markChannelMessages(input?: {
+export function markVoiceMessages(input?: {
   messageIds?: string[];
   read?: boolean;
   spoken?: boolean;
-}): ChannelMessage[] {
+}): VoiceMessage[] {
   const store = getActiveSessionStore();
   const idSet =
     input?.messageIds && input.messageIds.length > 0
       ? new Set(input.messageIds)
       : null;
-  store.channelMessages = store.channelMessages.map((message) =>
+  store.voiceMessages = store.voiceMessages.map((message) =>
     !idSet || idSet.has(message.id)
       ? {
           ...message,
           read: input?.read ?? message.read,
           spoken: input?.spoken ?? message.spoken,
-        }
+      }
       : message,
   );
-  return store.channelMessages;
+  return store.voiceMessages;
 }
 
 export function getCallSummary(): CallSummary {
@@ -844,11 +670,9 @@ export function getCallSummary(): CallSummary {
   return {
     status: call.status,
     contact: call.contact,
-    scenario: call.scenario,
     startedAt: call.startedAt,
     endedAt: call.endedAt,
     messageCount: call.transcript.length,
-    grillSession: call.grillSession,
     latestMessages,
     summary,
   };
@@ -867,12 +691,10 @@ export function getFullTranscript(): FullTranscript {
     call: {
       id: call.id,
       contact: call.contact,
-      scenario: call.scenario,
       status: call.status,
       startedAt: call.startedAt,
       endedAt: call.endedAt,
       muted: call.muted,
-      grillSession: call.grillSession,
     },
     transcript,
     conversation,
@@ -938,7 +760,7 @@ function isTranscriptRole(value: unknown): value is TranscriptRole {
   return value === "user" || value === "assistant" || value === "system";
 }
 
-function priorityArg(value: unknown): ChannelMessagePriority {
+function priorityArg(value: unknown): VoiceMessagePriority {
   return value === "low" || value === "high" ? value : "normal";
 }
 
@@ -948,61 +770,16 @@ function formatTranscript(entries: TranscriptEntry[]): string {
     .join("\n\n");
 }
 
-function defaultGrillSession(): GrillSession {
-  return {
-    id: "grill_idle",
-    active: false,
-    scope: "current codebase",
-    mode: "focused",
-    backlog: [],
-    lastFinding: null,
-    startedAt: null,
-    updatedAt: null,
-  };
-}
-
-function grillModeArg(value: unknown): GrillMode | undefined {
-  return value === "quick" || value === "deep" || value === "focused"
-    ? value
-    : undefined;
-}
-
-function selectGrillPrompt(userTurn: string, session: GrillSession): string {
-  const scope = session.scope || "current codebase";
-  const lowerTurn = userTurn.toLowerCase();
-  const questionPrefix =
-    "Ask one Grill Me question only, then stop. Include `Recommended answer:` after the question.";
-
-  if (lowerTurn.includes("implement") || lowerTurn.includes("build")) {
-    return `${questionPrefix} For ${scope}, what concrete user-visible behavior proves this implementation works, and which existing code path should the coding agent inspect before asking the user to validate it?`;
-  }
-
-  if (lowerTurn.includes("mcp") || lowerTurn.includes("codex")) {
-    return `${questionPrefix} For ${scope}, where exactly is the boundary between voice input, MCP transport, voice-agent conversation, and coding-agent execution, and what invariant prevents work from happening in the wrong layer?`;
-  }
-
-  if (lowerTurn.includes("transcript") || lowerTurn.includes("message")) {
-    return `${questionPrefix} For ${scope}, what transcript or message-ordering invariant must hold across partial, missing, retried, and injected realtime events, and where in the code should the coding agent verify it first?`;
-  }
-
-  if (lowerTurn.includes("start grilling") || lowerTurn.includes("walk the design tree")) {
-    return `${questionPrefix} For ${scope}, what is the exact plan or design decision being grilled, and what is the first unresolved branch in that decision tree?`;
-  }
-
-  return `${questionPrefix} For ${scope}, what is the weakest assumption in this plan, and what code or runtime evidence would falsify it before we spend more effort?`;
-}
-
 function createSessionStore(id = makeId("call"), secret = randomSecret()): SessionStore {
   const now = new Date().toISOString();
   return {
     current: {
       ...structuredClone(defaultCall),
       id,
-      grillSession: defaultGrillSession(),
       transcript: [],
     },
     events: [],
-    channelMessages: [],
+    voiceMessages: [],
     nextSequence: 1,
     secretHash: hashSecret(secret),
     createdAt: now,

@@ -1,19 +1,17 @@
 import {
   addCallEvent,
-  addChannelMessage,
+  addVoiceMessage,
   addUtterance,
   endCall,
-  getChannelMessages,
   getCallEvents,
   getCallState,
   getCallSummary,
   getFullTranscript,
+  getVoiceMessages,
   markEventsDelivered,
-  markChannelMessages,
-  recordGrillTurn,
+  markVoiceMessages,
   resetCall,
   setActiveCallSession,
-  setGrillMode,
   setMute,
   startCall,
 } from "@/app/lib/calls";
@@ -34,7 +32,7 @@ export async function GET(request: NextRequest) {
       events: getCallEvents({ includeDelivered: true, limit: 50 }),
       summary: getCallSummary(),
       fullTranscript: getFullTranscript(),
-      channelMessages: getChannelMessages({ includeRead: true, limit: 100 }),
+      voiceMessages: getVoiceMessages({ includeRead: true, limit: 100 }),
     });
   });
 }
@@ -45,7 +43,6 @@ export async function POST(request: NextRequest) {
       const body = (await request.json().catch(() => ({}))) as {
         action?: string;
         contact?: string;
-        scenario?: string;
         openingLine?: string;
         text?: string;
         role?: "user" | "assistant" | "system";
@@ -56,13 +53,8 @@ export async function POST(request: NextRequest) {
         payload?: unknown;
         eventIds?: string[];
         messageIds?: string[];
-        channelId?: string;
         sessionId?: string;
         priority?: string;
-        active?: boolean;
-        scope?: string;
-        mode?: string;
-        userTurn?: string;
       };
       const grant = requireSessionGrant(request, body.sessionId);
       if (!grant || !setActiveCallSession(grant.id)) {
@@ -75,7 +67,6 @@ export async function POST(request: NextRequest) {
             startCall({
               id: grant.id,
               contact: body.contact,
-              scenario: body.scenario,
               openingLine: body.openingLine,
             }),
           );
@@ -90,27 +81,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(endCall(body.summary));
         case "mute":
           return NextResponse.json(setMute(Boolean(body.muted)));
-        case "grill_mode":
-          return NextResponse.json(
-            setGrillMode({
-              active: Boolean(body.active),
-              scope: body.scope,
-              mode: body.mode,
-            }),
-          );
-        case "grill_turn":
-          return NextResponse.json(recordGrillTurn({ userTurn: body.userTurn ?? "" }));
         case "say_text":
           return NextResponse.json(
-            addChannelMessage({
-              channelId: body.channelId,
+            addVoiceMessage({
               text: body.text,
               priority: body.priority,
             }),
           );
-        case "mark_channel_messages":
+        case "mark_voice_messages":
           return NextResponse.json(
-            markChannelMessages({
+            markVoiceMessages({
               messageIds: body.messageIds,
               read: true,
               spoken: true,
@@ -137,10 +117,8 @@ export async function POST(request: NextRequest) {
                 "utterance",
                 "end",
                 "mute",
-                "grill_mode",
-                "grill_turn",
                 "say_text",
-                "mark_channel_messages",
+                "mark_voice_messages",
                 "reset",
                 "event",
                 "mark_delivered",

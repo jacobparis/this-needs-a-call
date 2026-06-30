@@ -1,15 +1,15 @@
 import {
-  addChannelMessage,
   addUtterance,
+  addVoiceMessage,
   endCall,
   getCallEvents,
-  getChannelMessages,
   getPendingCallBatch,
   getCallState,
   getCallSummary,
   getFullTranscript,
+  getVoiceMessages,
   markEventsDelivered,
-  markChannelMessages,
+  markVoiceMessages,
   resetCall,
   setMute,
   startCall,
@@ -39,10 +39,6 @@ const tools = [
       properties: {
         contact: { type: "string" },
         sessionId: { type: "string" },
-        scenario: {
-          type: "string",
-          enum: ["intake", "incident", "review"],
-        },
         openingLine: { type: "string" },
       },
     },
@@ -61,8 +57,7 @@ const tools = [
   },
   {
     name: "get_call_state",
-    description:
-      "Read the current call status, transcript, and in-memory grillMe mode state.",
+    description: "Read the current call status and transcript.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -128,11 +123,10 @@ const tools = [
   {
     name: "say_text",
     description:
-      "Send a user-visible message to a voice channel. Active channels may speak it; inactive channels show it as unread.",
+      "Send a concise user-visible message back into the active voice call.",
     inputSchema: {
       type: "object",
       properties: {
-        channelId: { type: "string" },
         text: { type: "string" },
         priority: { type: "string", enum: ["low", "normal", "high"] },
       },
@@ -140,20 +134,19 @@ const tools = [
     },
   },
   {
-    name: "get_channel_messages",
-    description: "Read pending or historical messages sent to voice channels.",
+    name: "get_voice_messages",
+    description: "Read pending or historical messages sent back into the voice call.",
     inputSchema: {
       type: "object",
       properties: {
         includeRead: { type: "boolean" },
-        channelId: { type: "string" },
         limit: { type: "number" },
       },
     },
   },
   {
-    name: "mark_channel_messages",
-    description: "Mark channel messages as read and spoken after the UI handles them.",
+    name: "mark_voice_messages",
+    description: "Mark voice messages as read and spoken after the UI handles them.",
     inputSchema: {
       type: "object",
       properties: {
@@ -268,7 +261,7 @@ async function handleRequest(request: JsonRpcRequest) {
             version: "0.1.0",
           },
           instructions:
-            "This MCP server is only an alternate input stream for a voice call. It does not execute project changes. Prefer get_pending_call_batch for unread voice updates. If its status is `settling`, do not summarize, act, or mark delivered yet; poll again later so new speech can join the same batch. If an event contains or implies a user request, call get_full_transcript for context when needed, then use the coding agent's normal tools outside this MCP server to handle the request. If an unread event has type `grill`, parse its JSON detail and follow the Grill Me contract: inspect relevant code context when it can answer facts, ask exactly one pointed question using the provided scope/prompt/severity/rules, include a recommended answer, and then wait. Use say_text only when the coding agent needs to push a concise user-visible message into a specific voice channel; include channelId, text, and priority. Mark handled event IDs with mark_events_delivered after the update is summarized or acted on.",
+            "This MCP server is only an alternate input stream for a voice call. It does not execute project changes. Prefer get_pending_call_batch for unread voice updates. If its status is `settling`, do not summarize, act, or mark delivered yet; poll again later so new speech can join the same batch. If an event contains or implies a user request, call get_full_transcript for context when needed, then use the coding agent's normal tools outside this MCP server to handle the request. Use say_text only when the coding agent needs to push a concise user-visible message into the active voice call. Mark handled event IDs with mark_events_delivered after the update is summarized or acted on.",
         },
       };
     case "notifications/initialized":
@@ -308,7 +301,6 @@ function handleToolCall(id: JsonRpcRequest["id"], params?: ToolCallParams) {
       result = startCall({
         id: stringArg(args.sessionId),
         contact: stringArg(args.contact),
-        scenario: stringArg(args.scenario),
         openingLine: stringArg(args.openingLine),
       });
       break;
@@ -344,21 +336,19 @@ function handleToolCall(id: JsonRpcRequest["id"], params?: ToolCallParams) {
       result = markEventsDelivered(stringArrayArg(args.eventIds));
       break;
     case "say_text":
-      result = addChannelMessage({
-        channelId: stringArg(args.channelId),
+      result = addVoiceMessage({
         text: stringArg(args.text),
         priority: stringArg(args.priority),
       });
       break;
-    case "get_channel_messages":
-      result = getChannelMessages({
+    case "get_voice_messages":
+      result = getVoiceMessages({
         includeRead: Boolean(args.includeRead),
-        channelId: stringArg(args.channelId),
         limit: numberArg(args.limit),
       });
       break;
-    case "mark_channel_messages":
-      result = markChannelMessages({
+    case "mark_voice_messages":
+      result = markVoiceMessages({
         messageIds: stringArrayArg(args.messageIds),
         read: true,
         spoken: true,
