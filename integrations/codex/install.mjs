@@ -42,7 +42,7 @@ await writeJson(path.join(pluginRoot, ".codex-plugin", "plugin.json"), {
     name: "This Needs A Call",
   },
   homepage: appUrl,
-  repository: "https://github.com/your-org/this-needs-a-call",
+  repository: "https://github.com/jacobparis/this-needs-a-call",
   license: "MIT",
   keywords: ["codex", "voice", "mcp", "calls"],
   skills: "./skills/",

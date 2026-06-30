@@ -4,8 +4,25 @@ import { Providers } from "@/app/components/Providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://github.com/jacobparis/this-needs-a-call"),
   title: "This Needs A Call",
   description: "A Vercel-native voice-call workspace with MCP hooks for coding agents.",
+  alternates: {
+    canonical: "https://github.com/jacobparis/this-needs-a-call",
+  },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-snippet": -1,
+      "max-image-preview": "none",
+      "max-video-preview": -1,
+    },
+  },
 };
 
 const geistSans = Geist({

@@ -7,7 +7,7 @@ type PageProps = {
 
 const repositoryUrl =
   process.env.NEXT_PUBLIC_TEMPLATE_REPOSITORY_URL ??
-  "https://github.com/your-org/this-needs-a-call";
+  "https://github.com/jacobparis/this-needs-a-call";
 
 const cloneAndLinkCommand = `git clone ${repositoryUrl}
 cd this-needs-a-call

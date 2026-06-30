@@ -12,7 +12,7 @@ Start from a local clone. The same checkout supports local development and
 hosted multi-device use:
 
 ```bash
-git clone https://github.com/your-org/this-needs-a-call
+git clone https://github.com/jacobparis/this-needs-a-call
 cd this-needs-a-call
 npm install
 vercel link
@@ -111,7 +111,7 @@ For marketplace-based distribution, add the repository as a Codex plugin
 marketplace:
 
 ```bash
-codex plugin marketplace add your-org/this-needs-a-call --ref main
+codex plugin marketplace add jacobparis/this-needs-a-call --ref main
 ```
 
 Then install `this-needs-a-call` from that marketplace. The direct marketplace
