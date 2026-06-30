@@ -39,7 +39,7 @@ export async function POST(request: Request) {
           "Call session created by Codex. The page should connect the realtime voice agent automatically.",
       });
       const url = new URL(request.url);
-      const appUrl = new URL("/", url.origin);
+      const appUrl = new URL(`/sessions/${encodeURIComponent(access.id)}`, url.origin);
       appUrl.searchParams.set("join", formatSessionToken(access));
       appUrl.searchParams.set("autostart", "1");
       if (body.agent?.trim()) {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 }
 
 function makeAppUrl(origin: string, access: { id: string; secret: string }, autostart: boolean) {
-  const appUrl = new URL("/", origin);
+  const appUrl = new URL(`/sessions/${encodeURIComponent(access.id)}`, origin);
   appUrl.searchParams.set("join", formatSessionToken(access));
   if (autostart) {
     appUrl.searchParams.set("autostart", "1");

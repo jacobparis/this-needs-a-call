@@ -56,7 +56,11 @@ const channels: Array<{
 const inputSampleRate = 24000;
 const defaultCodingAgentName = "Codex";
 
-export function VoiceSession() {
+type VoiceSessionProps = {
+  initialSessionId: string;
+};
+
+export function VoiceSession({ initialSessionId }: VoiceSessionProps) {
   const [activeChannelId, setActiveChannelId] = useState<ChannelId>("core");
   const [liveChannelId, setLiveChannelId] = useState<ChannelId>("core");
   const [channelStates, setChannelStates] = useState<
@@ -200,7 +204,7 @@ export function VoiceSession() {
     const joinToken = params.get("join");
     if (!joinToken) {
       window.setTimeout(() => {
-        void refreshSessionInfo();
+        void refreshSessionInfo(initialSessionId);
       }, 0);
       return;
     }
@@ -227,17 +231,20 @@ export function VoiceSession() {
         applySessionPayload(payload);
       }
       params.delete("join");
-      params.set("session", payload?.activeSession ?? "");
-      const nextUrl = `${window.location.pathname}?${params.toString()}`;
+      const activeSession = payload?.activeSession ?? initialSessionId;
+      const query = params.toString();
+      const nextUrl = `/sessions/${encodeURIComponent(activeSession)}${
+        query ? `?${query}` : ""
+      }`;
       window.history.replaceState(null, "", nextUrl);
-      await refreshSessionInfo(payload?.activeSession);
+      await refreshSessionInfo(activeSession);
     }
 
     void claimSession();
     return () => {
       cancelled = true;
     };
-  }, [applySessionPayload, refreshSessionInfo]);
+  }, [applySessionPayload, initialSessionId, refreshSessionInfo]);
 
   const addEvent = useCallback((type: string, detail: string) => {
     const event = {
@@ -470,9 +477,14 @@ export function VoiceSession() {
     setSessionId(nextSessionId);
     sessionIdRef.current = nextSessionId;
     const params = new URLSearchParams(window.location.search);
-    params.set("session", nextSessionId);
     params.delete("autostart");
-    window.history.replaceState(null, "", `${window.location.pathname}?${params}`);
+    params.delete("join");
+    const query = params.toString();
+    window.history.pushState(
+      null,
+      "",
+      `/sessions/${encodeURIComponent(nextSessionId)}${query ? `?${query}` : ""}`,
+    );
     await refreshSessionInfo(nextSessionId);
 
     const response = await fetch(

@@ -141,9 +141,9 @@ In Codex, invoke:
 ```
 
 The skill creates a magic-link session at your deployed app, starts the monitor,
-and gives you a browser URL. The browser claims the session into an HttpOnly
-cookie. A different browser cannot read the session unless you explicitly share
-the in-page magic link or QR code.
+and gives you a browser URL at `/sessions/<sessionId>`. The browser claims the
+session into an HttpOnly cookie. A different browser cannot read the session
+unless you explicitly share the in-page magic link or QR code.
 
 Magic links are bearer credentials for a single browser session. Anyone with a
 magic link can claim that session, which is what enables moving a call to a

@@ -1,9 +1,4 @@
 import { CopyableCommand } from "@/app/components/CopyableCommand";
-import { VoiceSession } from "@/app/components/VoiceSession";
-
-type PageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
 
 const repositoryUrl =
   process.env.NEXT_PUBLIC_TEMPLATE_REPOSITORY_URL ??
@@ -31,12 +26,7 @@ vercel env run -e production -- npm run install:codex-plugin -- \\
 const buttonClass =
   "inline-flex min-h-10 items-center justify-center rounded-[7px] border border-[var(--line)] bg-[var(--panel)] px-3.5 text-[13px] font-bold text-[var(--ink)] no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]";
 
-export default async function Page({ searchParams }: PageProps) {
-  const params = await searchParams;
-  if (params?.join || params?.session || params?.autostart) {
-    return <VoiceSession />;
-  }
-
+export default function Page() {
   return <LandingPage />;
 }
 

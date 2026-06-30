@@ -20,7 +20,7 @@ curl -sS https://example.com/api/call-session \
   --data '{"reset":true,"agent":"Codex"}'
 ```
 
-2. Parse the JSON response and keep the returned `url`/`magicLink`. It includes `autostart=1` and `join=<session>.<secret>`. The website claims that link into an HttpOnly cookie and removes the secret from the address bar.
+2. Parse the JSON response and keep the returned `url`/`magicLink`. It lands on `/sessions/<sessionId>` and includes `autostart=1` plus `join=<session>.<secret>`. The website claims that link into an HttpOnly cookie and removes the secret from the address bar.
 
 3. Open the returned URL for the user when a browser/navigation tool is available. If no browser tool is available, give the user the URL. The page auto-connects the realtime voice agent on load. Browser microphone capture may still require a user permission gesture.
 
