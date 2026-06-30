@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "app/api/queue/this-needs-a-call-events/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "this-needs-a-call-events"
+        }
+      ]
+    }
+  }
+}

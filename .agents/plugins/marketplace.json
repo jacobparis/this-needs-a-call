@@ -1,0 +1,20 @@
+{
+  "name": "this-needs-a-call",
+  "interface": {
+    "displayName": "This Needs A Call"
+  },
+  "plugins": [
+    {
+      "name": "this-needs-a-call",
+      "source": {
+        "source": "local",
+        "path": "./plugins/this-needs-a-call"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

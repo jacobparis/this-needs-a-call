@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "call": {
+      "type": "http",
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-your-mcp-shared-secret"
+      }
+    }
+  }
+}
