@@ -71,14 +71,12 @@ function getRedis(): Redis {
     return redis;
   }
 
-  const url =
-    process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token =
-    process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
     throw new Error(
-      "Upstash KV storage is required outside local memory mode. Set KV_REST_API_URL/KV_REST_API_TOKEN or UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN.",
+      "Upstash Redis storage is required outside local memory mode. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
     );
   }
 
@@ -88,9 +86,8 @@ function getRedis(): Redis {
 
 function hasUpstashEnv(): boolean {
   return Boolean(
-    (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
-      (process.env.UPSTASH_REDIS_REST_URL &&
-        process.env.UPSTASH_REDIS_REST_TOKEN),
+    process.env.UPSTASH_REDIS_REST_URL &&
+      process.env.UPSTASH_REDIS_REST_TOKEN,
   );
 }
 

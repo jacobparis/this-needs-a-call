@@ -8,9 +8,8 @@ const cloneAndLinkCommand = `git clone ${repositoryUrl}
 cd this-needs-a-call
 npm install
 vercel link
-export MCP_SHARED_SECRET="$(openssl rand -hex 32)"
-vercel env add MCP_SHARED_SECRET development --value "$MCP_SHARED_SECRET" --yes --force
-vercel env add MCP_SHARED_SECRET production --value "$MCP_SHARED_SECRET" --yes --force`;
+DEV_MCP_SHARED_SECRET="$(openssl rand -hex 32)"
+vercel env add MCP_SHARED_SECRET development --value "$DEV_MCP_SHARED_SECRET" --yes --force`;
 
 const localDevCommand = `vercel env pull
 vercel env run -- npm run dev:vercel`;
@@ -19,6 +18,8 @@ const localCodexInstallCommand = `vercel env run -- npm run install:codex-plugin
   --app-url http://localhost:3000`;
 
 const hostedDeployCommand = `vercel integration add upstash/upstash-kv
+PROD_MCP_SHARED_SECRET="$(openssl rand -hex 32)"
+vercel env add MCP_SHARED_SECRET production --value "$PROD_MCP_SHARED_SECRET" --yes --force
 DEPLOYMENT_URL="$(vercel deploy --prod --yes)"
 vercel env run -e production -- npm run install:codex-plugin -- \\
   --app-url "$DEPLOYMENT_URL"`;
@@ -144,7 +145,7 @@ function LandingPage() {
     {
       label: "Clone and Link",
       detail:
-        "Start from a local clone, link it to Vercel, then generate and register the MCP shared secret for development and production.",
+        "Start from a local clone, link it to Vercel, then generate and register a development MCP shared secret.",
       action: (
         <div className="grid w-full max-w-[760px] gap-3">
           <CopyableCommand command={cloneAndLinkCommand} />
@@ -165,7 +166,7 @@ function LandingPage() {
     {
       label: "Deploy and Install",
       detail:
-        "Provision Upstash Redis, deploy, capture the production URL from Vercel, and install the Codex plugin against that MCP server.",
+        "Provision Upstash Redis, set a separate production MCP shared secret, deploy, and install the Codex plugin against that MCP server.",
       action: (
         <CopyableCommand
           className="w-full max-w-[760px]"
