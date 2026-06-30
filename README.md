@@ -4,6 +4,8 @@ Self-host a voice call for your coding agent. Start a session from Codex, talk
 through an idea from your desk or phone, and let the Codex thread read the
 settled transcript in the background.
 
+Requires Node.js 24+ for stable local URLs through Portless.
+
 ## 1. Clone and Link
 
 ```bash
@@ -15,21 +17,24 @@ DEV_MCP_SHARED_SECRET="$(openssl rand -hex 32)"
 vercel env add MCP_SHARED_SECRET development --value "$DEV_MCP_SHARED_SECRET" --yes --force
 ```
 
-## 2. Run Locally
+## 2. Install the Local Plugin
 
 ```bash
 vercel env pull
-vercel env run -- npm run dev:vercel
+vercel env run -- npm run install:codex-plugin -- \
+  --app-url https://this-needs-a-call.localhost
 ```
 
-In another terminal:
+## 3. Run Locally
 
 ```bash
-vercel env run -- npm run install:codex-plugin -- \
-  --app-url http://localhost:3000
+vercel env run -- npm run dev:portless
 ```
 
-## 3. Deploy for Phone Handoff
+Portless gives local development the same stable URL every time:
+`https://this-needs-a-call.localhost`.
+
+## 4. Deploy for Phone Handoff
 
 Use a separate production secret. Do not reuse the development secret.
 
@@ -45,7 +50,7 @@ vercel env run -e production -- npm run install:codex-plugin -- \
 The Upstash marketplace product is Redis-compatible storage. Production fails
 closed without `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 
-## 4. Start a Call
+## 5. Start a Call
 
 In Codex:
 

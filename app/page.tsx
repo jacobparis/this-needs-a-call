@@ -11,11 +11,13 @@ vercel link
 DEV_MCP_SHARED_SECRET="$(openssl rand -hex 32)"
 vercel env add MCP_SHARED_SECRET development --value "$DEV_MCP_SHARED_SECRET" --yes --force`;
 
-const localDevCommand = `vercel env pull
-vercel env run -- npm run dev:vercel`;
+const localAppUrl = "https://this-needs-a-call.localhost";
 
-const localCodexInstallCommand = `vercel env run -- npm run install:codex-plugin -- \\
-  --app-url http://localhost:3000`;
+const localCodexInstallCommand = `vercel env pull
+vercel env run -- npm run install:codex-plugin -- \\
+  --app-url ${localAppUrl}`;
+
+const localDevCommand = `vercel env run -- npm run dev:portless`;
 
 const hostedDeployCommand = `vercel integration add upstash/upstash-kv
 PROD_MCP_SHARED_SECRET="$(openssl rand -hex 32)"
@@ -153,13 +155,21 @@ function LandingPage() {
       ),
     },
     {
-      label: "Run Locally",
+      label: "Install the Plugin",
       detail:
-        "Pull the Vercel dev environment, run the app through Vercel, then install the Codex plugin with localhost as the MCP server.",
+        "Pull the Vercel dev environment and install the Codex plugin before starting the app. The MCP server points at the stable Portless URL.",
+      action: (
+        <div className="grid w-full max-w-[760px] gap-3">
+          <CopyableCommand command={localCodexInstallCommand} />
+        </div>
+      ),
+    },
+    {
+      label: "Run Locally",
+      detail: `Start Vercel dev behind Portless at ${localAppUrl}.`,
       action: (
         <div className="grid w-full max-w-[760px] gap-3">
           <CopyableCommand command={localDevCommand} />
-          <CopyableCommand command={localCodexInstallCommand} />
         </div>
       ),
     },

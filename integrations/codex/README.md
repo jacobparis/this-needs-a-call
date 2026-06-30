@@ -6,8 +6,9 @@ The installer writes a local Codex plugin configured for one app URL and one
 Local development:
 
 ```bash
+vercel env pull
 vercel env run -- npm run install:codex-plugin -- \
-  --app-url http://localhost:3000
+  --app-url https://this-needs-a-call.localhost
 ```
 
 Hosted deployment:
